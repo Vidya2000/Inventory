@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inventory</title>
+</head>
+<body>
+    <h2>📦 Inventory</h2>
+    <a href="{{ url_for('login') }}">Admin Login</a> |
+    {% if session.get('admin') %}<a href="{{ url_for('logout') }}">Logout</a>{% endif %}
+    <br><br>
+
+    <table border="1" cellpadding="5">
+        <tr><th>ID</th><th>Name</th><th>Price</th><th>Stock</th><th>Sell</th></tr>
+        {% for p in products %}
+        <tr>
+            <td>{{p[0]}}</td>
+            <td>{{p[1]}}</td>
+            <td>{{p[2]}}</td>
+            <td>{{p[3]}}</td>
+            <td>
+                <form action="{{ url_for('sell', pid=p[0]) }}" method="post">
+                    <input type="password" name="password" placeholder="Sale Password" required>
+                    <input type="number" name="quantity" min="1" required>
+                    <button type="submit">Sell</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul>
+        {% for category, msg in messages %}
+          <li><b>{{ category.title() }}:</b> {{ msg }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+</body>
+</html>
