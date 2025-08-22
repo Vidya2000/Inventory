@@ -1,15 +1,17 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
 import sqlite3
+import csv
 import os
 
 app = Flask(__name__)
-app.secret_key = "supersecret"   # session key
+app.secret_key = "supersecret"
+SALE_PASSWORD = "sell123"
 
-SALE_PASSWORD = "sell123"        # password for selling
+DB_FILE = "inventory.db"
 
 # ---------- DATABASE FUNCTIONS ----------
 def create_table():
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS products
                  (id TEXT PRIMARY KEY, name TEXT, price REAL, stock INTEGER)''')
@@ -17,7 +19,7 @@ def create_table():
     conn.close()
 
 def view_products():
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT id, name, price, stock FROM products")
     rows = c.fetchall()
@@ -25,7 +27,7 @@ def view_products():
     return rows
 
 def fetch_product_by_id(product_id):
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT id, name, price, stock FROM products WHERE id=?", (product_id,))
     row = c.fetchone()
@@ -33,7 +35,7 @@ def fetch_product_by_id(product_id):
     return row
 
 def add_product(product_id, name, price, stock):
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("INSERT INTO products (id, name, price, stock) VALUES (?, ?, ?, ?)",
               (product_id, name, price, stock))
@@ -41,7 +43,7 @@ def add_product(product_id, name, price, stock):
     conn.close()
 
 def update_product(product_id, name, price, stock):
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("UPDATE products SET name=?, price=?, stock=? WHERE id=?",
               (name, price, stock, product_id))
@@ -49,14 +51,14 @@ def update_product(product_id, name, price, stock):
     conn.close()
 
 def delete_product(product_id):
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("DELETE FROM products WHERE id=?", (product_id,))
     conn.commit()
     conn.close()
 
 def reduce_stock(product_id, quantity):
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT stock FROM products WHERE id=?", (product_id,))
     stock = c.fetchone()[0]
@@ -68,12 +70,15 @@ def reduce_stock(product_id, quantity):
     conn.close()
     return False
 
-
 # ---------- ROUTES ----------
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def home():
     products = view_products()
-    return render_template("index.html", products=products)
+    if request.method == "POST":
+        pid = request.form.get("product_id")
+        product = fetch_product_by_id(pid)
+        return render_template("index.html", products=products, product=product)
+    return render_template("index.html", products=products, product=None)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -92,12 +97,17 @@ def logout():
     flash("Logged out successfully", "info")
     return redirect(url_for("home"))
 
-@app.route("/admin")
+@app.route("/admin", methods=["GET", "POST"])
 def admin():
     if "admin" not in session:
         return redirect(url_for("login"))
     products = view_products()
-    return render_template("admin.html", products=products)
+    selected_product = None
+    if request.method == "POST":
+        pid = request.form.get("product_id")
+        if pid:
+            selected_product = fetch_product_by_id(pid)
+    return render_template("admin.html", products=products, selected_product=selected_product)
 
 @app.route("/add", methods=["POST"])
 def add():
@@ -145,10 +155,38 @@ def sell(pid):
         flash("Invalid Sale Password", "danger")
     return redirect(url_for("home"))
 
+@app.route("/export_csv")
+def export_csv():
+    products = view_products()
+    csv_file = "products.csv"
+    with open(csv_file, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["ID", "Name", "Price", "Stock"])
+        writer.writerows(products)
+    return send_file(csv_file, as_attachment=True)
 
+@app.route("/import_csv_route", methods=["POST"])
+def import_csv_route():
+    if "admin" not in session:
+        return redirect(url_for("login"))
+    file = request.files["file"]
+    if not file:
+        flash("No file selected", "danger")
+        return redirect(url_for("admin"))
+    csv_data = csv.reader(file.stream.read().decode("UTF-8").splitlines())
+    next(csv_data)  # skip header
+    count = 0
+    for row in csv_data:
+        try:
+            add_product(row[0], row[1], float(row[2]), int(row[3]))
+            count += 1
+        except:
+            continue
+    flash(f"Imported {count} products successfully", "success")
+    return redirect(url_for("admin"))
+
+# ---------- RUN SERVER ----------
 if __name__ == "__main__":
     create_table()
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-
+    app.run(host="0.0.0.0", port=port, debug=True)
