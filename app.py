@@ -8,6 +8,7 @@ app.secret_key = "supersecret"
 SALE_PASSWORD = "sell123"
 
 DB_FILE = "inventory.db"
+LOW_STOCK_THRESHOLD = 10  # Products with stock below this will be highlighted
 
 # ---------- DATABASE FUNCTIONS ----------
 def create_table():
@@ -18,11 +19,16 @@ def create_table():
     conn.commit()
     conn.close()
 
-def view_products():
+def view_products(search=None):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT id, name, price, stock FROM products")
-    rows = c.fetchall()
+    if search:
+        like_pattern = f"%{search}%"
+        c.execute("SELECT id, name, price, stock FROM products WHERE id LIKE ? OR name LIKE ?", 
+                  (like_pattern, like_pattern))
+        rows = c.fetchall()
+    else:
+        rows = []
     conn.close()
     return rows
 
@@ -73,12 +79,18 @@ def reduce_stock(product_id, quantity):
 # ---------- ROUTES ----------
 @app.route("/", methods=["GET", "POST"])
 def home():
-    products = view_products()
+    products = []
+    search = ""
+    product = None
+
     if request.method == "POST":
-        pid = request.form.get("product_id")
+        search = request.form.get("search", "").strip()
+        products = view_products(search)
+    elif request.method == "GET" and "product_id" in request.args:
+        pid = request.args.get("product_id")
         product = fetch_product_by_id(pid)
-        return render_template("index.html", products=products, product=product)
-    return render_template("index.html", products=products, product=None)
+
+    return render_template("index.html", products=products, product=product, search=search, LOW_STOCK_THRESHOLD=LOW_STOCK_THRESHOLD)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -101,12 +113,15 @@ def logout():
 def admin():
     if "admin" not in session:
         return redirect(url_for("login"))
-    products = view_products()
+
     selected_product = None
+    products = []
+
     if request.method == "POST":
-        pid = request.form.get("product_id")
-        if pid:
-            selected_product = fetch_product_by_id(pid)
+        search = request.form.get("search", "").strip()
+        products = view_products(search)
+        if len(products) == 1:
+            selected_product = products[0]
     return render_template("admin.html", products=products, selected_product=selected_product)
 
 @app.route("/add", methods=["POST"])

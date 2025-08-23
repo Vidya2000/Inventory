@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory</title>
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Animate.css -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 </head>
 <body class="bg-light">
@@ -21,30 +19,39 @@
     <div class="card p-3 mb-4 animate__animated animate__fadeIn">
         <h4>Search Product</h4>
         <form method="post" action="{{ url_for('home') }}" class="d-flex gap-2 flex-wrap">
-            <select name="product_id" class="form-select w-auto" required>
-                <option value="">--Select Product ID--</option>
-                {% for p in products %}
-                    <option value="{{ p[0] }}">{{ p[0] }}</option>
-                {% endfor %}
-            </select>
+            <input type="text" name="search" value="{{ search }}" placeholder="Enter ID or Name" class="form-control w-auto" required>
             <button type="submit" class="btn btn-success">Search</button>
         </form>
     </div>
 
-    <!-- Product Info -->
-    {% if product %}
+    <!-- Product Info / List -->
+    {% if products %}
     <div class="card p-3 mb-4 animate__animated animate__fadeInUp">
-        <h4>Product Info</h4>
-        <p><b>ID:</b> {{ product[0] }}</p>
-        <p><b>Name:</b> {{ product[1] }}</p>
-        <p><b>Price:</b> {{ product[2] }}</p>
-        <p><b>Stock:</b> {{ product[3] }}</p>
-
-        <form method="post" action="{{ url_for('sell', pid=product[0]) }}" class="d-flex gap-2 flex-wrap">
-            <input type="number" name="quantity" min="1" placeholder="Quantity" class="form-control w-auto" required>
-            <input type="password" name="password" placeholder="Sale Password" class="form-control w-auto" required>
-            <button type="submit" class="btn btn-danger">Sell</button>
-        </form>
+        <h4>Products</h4>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>ID</th><th>Name</th><th>Price</th><th>Stock</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr class="{% if p[3] < LOW_STOCK_THRESHOLD %}table-danger{% endif %}">
+                    <td>{{ p[0] }}</td>
+                    <td>{{ p[1] }}</td>
+                    <td>{{ p[2] }}</td>
+                    <td>{{ p[3] }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('sell', pid=p[0]) }}" class="d-flex gap-1 flex-wrap">
+                            <input type="number" name="quantity" min="1" placeholder="Qty" class="form-control w-auto" required>
+                            <input type="password" name="password" placeholder="Sale Password" class="form-control w-auto" required>
+                            <button type="submit" class="btn btn-danger btn-sm">Sell</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     {% endif %}
 
@@ -63,8 +70,6 @@
     {% endwith %}
 
 </div>
-
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
