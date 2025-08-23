@@ -8,7 +8,7 @@ app.secret_key = "supersecret"
 SALE_PASSWORD = "sell123"
 
 DB_FILE = "inventory.db"
-LOW_STOCK_THRESHOLD = 10  # Products with stock below this will be highlighted
+LOW_STOCK_THRESHOLD = 10  # Highlight products with stock below this
 
 # ---------- DATABASE FUNCTIONS ----------
 def create_table():
@@ -77,20 +77,9 @@ def reduce_stock(product_id, quantity):
     return False
 
 # ---------- ROUTES ----------
-@app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["GET"])
 def home():
-    products = []
-    search = ""
-    product = None
-
-    if request.method == "POST":
-        search = request.form.get("search", "").strip()
-        products = view_products(search)
-    elif request.method == "GET" and "product_id" in request.args:
-        pid = request.args.get("product_id")
-        product = fetch_product_by_id(pid)
-
-    return render_template("index.html", products=products, product=product, search=search, LOW_STOCK_THRESHOLD=LOW_STOCK_THRESHOLD)
+    return render_template("index.html", LOW_STOCK_THRESHOLD=LOW_STOCK_THRESHOLD)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -109,20 +98,11 @@ def logout():
     flash("Logged out successfully", "info")
     return redirect(url_for("home"))
 
-@app.route("/admin", methods=["GET", "POST"])
+@app.route("/admin", methods=["GET"])
 def admin():
     if "admin" not in session:
         return redirect(url_for("login"))
-
-    selected_product = None
-    products = []
-
-    if request.method == "POST":
-        search = request.form.get("search", "").strip()
-        products = view_products(search)
-        if len(products) == 1:
-            selected_product = products[0]
-    return render_template("admin.html", products=products, selected_product=selected_product)
+    return render_template("admin.html", LOW_STOCK_THRESHOLD=LOW_STOCK_THRESHOLD)
 
 @app.route("/add", methods=["POST"])
 def add():
@@ -199,6 +179,14 @@ def import_csv_route():
             continue
     flash(f"Imported {count} products successfully", "success")
     return redirect(url_for("admin"))
+
+# Live search JSON endpoint
+@app.route("/search_products")
+def search_products():
+    query = request.args.get("q", "").strip()
+    results = view_products(query)
+    products_list = [{"id": p[0], "name": p[1], "price": p[2], "stock": p[3]} for p in results]
+    return {"products": products_list}
 
 # ---------- RUN SERVER ----------
 if __name__ == "__main__":
