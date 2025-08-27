@@ -26,19 +26,11 @@ def view_products(search=None):
         like_pattern = f"%{search}%"
         c.execute("SELECT id, name, price, stock FROM products WHERE id LIKE ? OR name LIKE ?", 
                   (like_pattern, like_pattern))
-        rows = c.fetchall()
     else:
-        rows = []
+        c.execute("SELECT id, name, price, stock FROM products")
+    rows = c.fetchall()
     conn.close()
     return rows
-
-def fetch_product_by_id(product_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT id, name, price, stock FROM products WHERE id=?", (product_id,))
-    row = c.fetchone()
-    conn.close()
-    return row
 
 def add_product(product_id, name, price, stock):
     conn = sqlite3.connect(DB_FILE)
@@ -102,7 +94,11 @@ def logout():
 def admin():
     if "admin" not in session:
         return redirect(url_for("login"))
-    return render_template("admin.html", LOW_STOCK_THRESHOLD=LOW_STOCK_THRESHOLD)
+    products = view_products()
+    # convert each tuple to dict
+    products = [{"id": p[0], "name": p[1], "price": p[2], "stock": p[3]} for p in products]
+    return render_template("admin.html", products=products, LOW_STOCK_THRESHOLD=LOW_STOCK_THRESHOLD)
+
 
 @app.route("/add", methods=["POST"])
 def add():
@@ -130,7 +126,7 @@ def update(pid):
     flash("Product updated successfully", "success")
     return redirect(url_for("admin"))
 
-@app.route("/delete/<pid>")
+@app.route("/delete/<pid>", methods=["POST"])
 def delete(pid):
     if "admin" not in session:
         return redirect(url_for("login"))
